@@ -1,2 +1,0 @@
-# pludux.com
-Pludux App
