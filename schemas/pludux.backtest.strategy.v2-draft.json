@@ -128,6 +128,15 @@
       ],
       "title": "Signal Timing"
     },
+    "pyramidingRetrigger": {
+      "type": "string",
+      "enum": [
+        "EVERY_EVALUATION",
+        "AFTER_FALSE"
+      ],
+      "title": "Pyramiding Retrigger",
+      "description": "EVERY_EVALUATION allows another pyramiding entry whenever the signal is true at an eligible evaluation. AFTER_FALSE allows one entry per true period and requires a false evaluation before the signal can trigger again."
+    },
     "exitActivation": {
       "type": "string",
       "enum": [
@@ -194,6 +203,15 @@
                 "timing": {
                   "$ref": "#/$defs/signalTiming"
                 },
+                "retrigger": {
+                  "$ref": "#/$defs/pyramidingRetrigger"
+                },
+                "cooldown": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "title": "Cooldown Bars",
+                  "description": "Number of complete bars after each accepted entry during which all pyramiding processing is paused. Zero disables the cooldown."
+                },
                 "maxLayers": {
                   "type": "integer",
                   "minimum": 1,
@@ -230,11 +248,15 @@
               "required": [
                 "signal",
                 "timing",
+                "retrigger",
+                "cooldown",
                 "maxLayers"
               ],
               "default": {
                 "signal": false,
                 "timing": "NEXT_OPEN",
+                "retrigger": "EVERY_EVALUATION",
+                "cooldown": 0,
                 "maxLayers": 1,
                 "stopTargetReference": {
                   "favorable": "AVERAGE_PRICE",
@@ -462,9 +484,10 @@
             "EQUITY",
             "EQUITY_PERCENT",
             "DRAWDOWN",
+            "PYRAMIDING_LAYER",
             "POSITION_R_MULTIPLE"
           ],
-          "description": "Backtest account-state shorthand. EQUITY reads the account equity available at the current evaluation moment. EQUITY_PERCENT reads that equity as a percentage of initial capital. DRAWDOWN reads the account drawdown available at the current evaluation moment."
+          "description": "Backtest-state shorthand. EQUITY reads the account equity available at the current evaluation moment. EQUITY_PERCENT reads that equity as a percentage of initial capital. DRAWDOWN reads the account drawdown available at the current evaluation moment. PYRAMIDING_LAYER reads the accepted position layer count, using 0 while flat."
         },
         {
           "$ref": "#/$defs/series",
@@ -2681,6 +2704,39 @@
       "title": "Stop Loss 1R",
       "description": "Stop price exactly one explicit riskDistance from the configured reference price."
     },
+    "stopLossRMultipleMethod": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/baseMethod"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "SL_R_MULTIPLE"
+            },
+            "params": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "multiple": {
+                  "$ref": "#/$defs/seriesAsParameter",
+                  "title": "Multiple",
+                  "description": "Positive risk multiple of the explicit riskDistance."
+                }
+              },
+              "required": [
+                "multiple"
+              ]
+            }
+          },
+          "required": [
+            "params"
+          ]
+        }
+      ],
+      "title": "Stop Loss R Multiple",
+      "description": "Calculates an absolute stop-loss price from the active reference price and explicit riskDistance."
+    },
     "takeProfitRMultipleMethod": {
       "allOf": [
         {
@@ -2714,7 +2770,7 @@
       "title": "Take Profit R Multiple",
       "description": "Calculates an absolute take-profit price from the active reference price and explicit riskDistance."
     },
-    "positionContextPriceMethod": {
+    "positionContextValueMethod": {
       "allOf": [
         {
           "$ref": "#/$defs/baseMethod"
@@ -2727,7 +2783,8 @@
                 "LATEST_ENTRY_PRICE",
                 "AVERAGE_PRICE",
                 "STOP_TARGET_REF_PRICE",
-                "POSITION_DIRECTION"
+                "POSITION_DIRECTION",
+                "PYRAMIDING_LAYER"
               ]
             },
             "params": {
@@ -2738,7 +2795,7 @@
         }
       ],
       "title": "Position Context Value",
-      "description": "Reads a scoped backtest position value while an open position is being evaluated. Outside active position context, the value is NaN."
+      "description": "Reads a backtest position-context value. Price and direction methods return NaN outside an active position; PYRAMIDING_LAYER returns 0 while flat and the accepted layer count while open."
     },
     "positionRMultipleMethod": {
       "allOf": [
@@ -2893,10 +2950,13 @@
           "$ref": "#/$defs/stopLoss1RMethod"
         },
         {
+          "$ref": "#/$defs/stopLossRMultipleMethod"
+        },
+        {
           "$ref": "#/$defs/takeProfitRMultipleMethod"
         },
         {
-          "$ref": "#/$defs/positionContextPriceMethod"
+          "$ref": "#/$defs/positionContextValueMethod"
         },
         {
           "$ref": "#/$defs/positionRMultipleMethod"
